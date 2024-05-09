@@ -23,6 +23,7 @@ impl RespEncode for RespArray {
 
 impl RespDecode for RespArray {
     const PREFIX: &'static str = "*";
+    const TYPE: &'static str = "";
 
     fn decode(_buf: &mut BytesMut) -> Result<Self, RespError> {
         todo!()
