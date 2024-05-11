@@ -5,6 +5,9 @@ mod double;
 mod integer;
 mod protocols;
 
+mod set;
+mod simple_error;
+
 mod map;
 mod null;
 
@@ -16,7 +19,7 @@ use thiserror::Error;
 
 pub use self::{
     array::RespArray, bulk_strings::BulkString, map::RespMap, null::RespNull, protocols::RespFrame,
-    simple_string::SimpleString,
+    set::RespSet, simple_error::SimpleError, simple_string::SimpleString,
 };
 
 const CRLF: &[u8] = b"\r\n";
@@ -34,17 +37,15 @@ pub enum RespError {
     InvalidFrame(String),
     #[error("Invalid frame type: {0}")]
     InvalidFrameType(String),
-    // #[error("Invalid frame length： {0}")]
-    // InvalidFrameLength(isize),
     #[error("Frame is not complete")]
     NotComplete,
     //
-    // #[error("Parse error: {0}")]
-    // ParseIntError(#[from] std::num::ParseIntError),
-    // #[error("Utf8 error: {0}")]
-    // Utf8Error(#[from] std::string::FromUtf8Error),
-    // #[error("Parse float error: {0}")]
-    // ParseFloatError(#[from] std::num::ParseFloatError),
+    #[error("Parse error: {0}")]
+    ParseIntError(#[from] std::num::ParseIntError),
+    #[error("Utf8 error: {0}")]
+    Utf8Error(#[from] std::string::FromUtf8Error),
+    #[error("Parse float error: {0}")]
+    ParseFloatError(#[from] std::num::ParseFloatError),
 }
 
 /// decode the response from a byte array

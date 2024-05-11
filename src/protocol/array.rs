@@ -1,4 +1,5 @@
-use bytes::BytesMut;
+use bytes::{Buf, BytesMut};
+use std::ops::Deref;
 
 use super::{RespDecode, RespEncode, RespError, RespFrame};
 
@@ -23,13 +24,42 @@ impl RespEncode for RespArray {
 
 impl RespDecode for RespArray {
     const PREFIX: &'static str = "*";
-    const TYPE: &'static str = "";
+    const TYPE: &'static str = "array";
 
-    fn decode(_buf: &mut BytesMut) -> Result<Self, RespError> {
-        todo!()
+    fn decode(buf: &mut BytesMut) -> Result<Self, RespError> {
+        let (end, len) = super::parse_length(buf, Self::PREFIX)?;
+        let total_len = super::calc_total_length(buf, end, len, Self::PREFIX)?;
+
+        if buf.len() < total_len {
+            return Err(RespError::NotComplete);
+        }
+
+        buf.advance(end + super::CRLF_LEN);
+
+        let mut frames = Vec::with_capacity(len);
+        for _ in 0..len {
+            frames.push(RespFrame::decode(buf)?);
+        }
+
+        Ok(RespArray::new(frames))
     }
 
-    fn expect_length(_buf: &[u8]) -> Result<usize, RespError> {
-        todo!()
+    fn expect_length(buf: &[u8]) -> Result<usize, RespError> {
+        let (end, len) = super::parse_length(buf, Self::PREFIX)?;
+        super::calc_total_length(buf, end, len, Self::PREFIX)
+    }
+}
+
+impl RespArray {
+    pub fn new(s: impl Into<Vec<RespFrame>>) -> Self {
+        RespArray(s.into())
+    }
+}
+
+impl Deref for RespArray {
+    type Target = Vec<RespFrame>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

@@ -12,8 +12,7 @@ impl RespDecode for i64 {
         let end = super::find_crlf(buf, 1).ok_or(RespError::NotComplete)?;
         let data = buf.split_to(end + super::CRLF_LEN);
         let s = String::from_utf8_lossy(&data[Self::PREFIX.len()..end]);
-        Ok(s.parse()
-            .map_err(|_| RespError::InvalidFrame(format!("Expected integer, but got: {}", s))))?
+        Ok(s.parse()?)
     }
 
     fn expect_length(_buf: &[u8]) -> Result<usize, RespError> {

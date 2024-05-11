@@ -2,6 +2,8 @@ use crate::protocol::array::RespArray;
 use crate::protocol::bulk_strings::BulkString;
 use crate::protocol::map::RespMap;
 use crate::protocol::null::RespNull;
+use crate::protocol::set::RespSet;
+use crate::protocol::simple_error::SimpleError;
 use crate::protocol::simple_string::SimpleString;
 use crate::protocol::{RespDecode, RespError};
 use bytes::BytesMut;
@@ -11,7 +13,7 @@ use enum_dispatch::enum_dispatch;
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum RespFrame {
     SimpleString(SimpleString),
-    // Error(SimpleError),
+    Error(SimpleError),
     Integer(i64),
     BulkString(BulkString),
     // NullBulkString(RespNullBulkString),
@@ -21,7 +23,7 @@ pub enum RespFrame {
     Boolean(bool),
     Double(f64),
     Map(RespMap),
-    // Set(RespSet),
+    Set(RespSet),
 }
 impl RespDecode for RespFrame {
     const PREFIX: &'static str = "";
@@ -34,12 +36,16 @@ impl RespDecode for RespFrame {
                 let frame = SimpleString::decode(buf)?;
                 Ok(frame.into())
             }
-
+            Some(b'-') => {
+                let frame = SimpleError::decode(buf)?;
+                Ok(frame.into())
+            }
             Some(b':') => {
                 let frame = i64::decode(buf)?;
                 Ok(frame.into())
             }
             Some(b'$') => {
+                // try null bulk string first
                 let frame = BulkString::decode(buf)?;
                 Ok(frame.into())
             }
@@ -64,7 +70,10 @@ impl RespDecode for RespFrame {
                 let frame = RespMap::decode(buf)?;
                 Ok(frame.into())
             }
-
+            Some(b'~') => {
+                let frame = RespSet::decode(buf)?;
+                Ok(frame.into())
+            }
             None => Err(RespError::NotComplete),
             _ => Err(RespError::InvalidFrameType(format!(
                 "expect_length: unknown frame type: {:?}",
@@ -76,6 +85,8 @@ impl RespDecode for RespFrame {
     fn expect_length(buf: &[u8]) -> Result<usize, RespError> {
         let mut iter = buf.iter().peekable();
         match iter.peek() {
+            Some(b'~') => RespSet::expect_length(buf),
+            Some(b'-') => SimpleError::expect_length(buf),
             Some(b'*') => RespArray::expect_length(buf),
             Some(b'%') => RespMap::expect_length(buf),
             Some(b'$') => BulkString::expect_length(buf),
