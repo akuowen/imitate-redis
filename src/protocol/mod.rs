@@ -136,6 +136,25 @@ fn extract_fixed_data(
     Ok(())
 }
 
+fn extract_fixed_data_noadv(
+    buf: &mut BytesMut,
+    expect: &str,
+    expect_type: &str,
+) -> Result<(), RespError> {
+    if buf.len() < expect.len() {
+        return Err(RespError::NotComplete);
+    }
+
+    if !buf.starts_with(expect.as_bytes()) {
+        return Err(RespError::InvalidFrameType(format!(
+            "expect: {}, got: {:?}",
+            expect_type, buf
+        )));
+    }
+
+    Ok(())
+}
+
 fn calc_total_length(buf: &[u8], end: usize, len: usize, prefix: &str) -> Result<usize, RespError> {
     let mut total = end + CRLF_LEN;
     let mut data = &buf[total..];
