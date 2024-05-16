@@ -1,15 +1,14 @@
 use super::{extract_args, validate_command, CommandExecutor, Set, RESP_OK};
 use crate::{
     cmd::{CommandError, Get},
-    RespArray, RespFrame, RespNull,
+    RespArray, RespFrame,
 };
 
 impl CommandExecutor for Get {
     fn execute(self, backend: &crate::Backend) -> RespFrame {
-        match backend.get(&self.key) {
-            Some(value) => value,
-            None => RespFrame::Null(RespNull),
-        }
+        backend
+            .get(&self.key)
+            .unwrap_or(RespFrame::Null(crate::RespNull))
     }
 }
 
@@ -27,9 +26,13 @@ impl TryFrom<RespArray> for Get {
 
         let mut args = extract_args(value, 1)?.into_iter();
         match args.next() {
-            Some(RespFrame::BulkString(key)) => Ok(Get {
-                key: String::from_utf8(key.0)?,
-            }),
+            Some(RespFrame::BulkString(key)) => {
+                let key = match key.0 {
+                    Some(k) => String::from_utf8(k)?,
+                    None => return Err(CommandError::InvalidArgument("Invalid field".to_string())),
+                };
+                Ok(Get { key })
+            }
             _ => Err(CommandError::InvalidArgument("Invalid key".to_string())),
         }
     }
@@ -42,10 +45,14 @@ impl TryFrom<RespArray> for Set {
 
         let mut args = extract_args(value, 1)?.into_iter();
         match (args.next(), args.next()) {
-            (Some(RespFrame::BulkString(key)), Some(value)) => Ok(Set {
-                key: String::from_utf8(key.0)?,
-                value,
-            }),
+            (Some(RespFrame::BulkString(key)), Some(value)) => {
+                let key = match key.0 {
+                    Some(k) => String::from_utf8(k)?,
+                    None => return Err(CommandError::InvalidArgument("Invalid key".to_string())),
+                };
+
+                Ok(Set { key, value })
+            }
             _ => Err(CommandError::InvalidArgument(
                 "Invalid key or value".to_string(),
             )),

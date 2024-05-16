@@ -89,14 +89,19 @@ impl TryFrom<RespFrame> for Command {
 impl TryFrom<RespArray> for Command {
     type Error = CommandError;
     fn try_from(v: RespArray) -> Result<Self, Self::Error> {
-        match v.first() {
-            Some(RespFrame::BulkString(ref cmd)) => match cmd.as_ref() {
-                b"get" => Ok(Get::try_from(v)?.into()),
-                b"set" => Ok(Set::try_from(v)?.into()),
-                b"hget" => Ok(HGet::try_from(v)?.into()),
-                b"hset" => Ok(HSet::try_from(v)?.into()),
-                b"hgetall" => Ok(HGetAll::try_from(v)?.into()),
-                _ => Ok(Unrecognized.into()),
+        match &v.0 {
+            Some(vec) => match vec.first() {
+                Some(RespFrame::BulkString(ref cmd)) => match cmd.as_ref() {
+                    b"get" => Ok(Get::try_from(v)?.into()),
+                    b"set" => Ok(Set::try_from(v)?.into()),
+                    b"hget" => Ok(HGet::try_from(v)?.into()),
+                    b"hset" => Ok(HSet::try_from(v)?.into()),
+                    b"hgetall" => Ok(HGetAll::try_from(v)?.into()),
+                    _ => Ok(Unrecognized.into()),
+                },
+                _ => Err(CommandError::InvalidCommand(
+                    "Command must have a BulkString as the first argument".to_string(),
+                )),
             },
             _ => Err(CommandError::InvalidCommand(
                 "Command must have a BulkString as the first argument".to_string(),
@@ -116,37 +121,48 @@ fn validate_command(
     names: &[&'static str],
     n_args: usize,
 ) -> Result<(), CommandError> {
-    if value.len() != n_args + names.len() {
-        return Err(CommandError::InvalidArgument(format!(
-            "{} command must have exactly {} argument",
-            names.join(" "),
-            n_args
-        )));
-    }
+    match &value.0 {
+        Some(vec) => {
+            if vec.len() != n_args + names.len() {
+                return Err(CommandError::InvalidArgument(format!(
+                    "{} command must have exactly {} argument",
+                    names.join(" "),
+                    n_args
+                )));
+            }
 
-    for (i, name) in names.iter().enumerate() {
-        match value[i] {
-            RespFrame::BulkString(ref cmd) => {
-                if cmd.as_ref().to_ascii_lowercase() != name.as_bytes() {
-                    return Err(CommandError::InvalidCommand(format!(
-                        "Invalid command: expected {}, got {}",
-                        name,
-                        String::from_utf8_lossy(cmd.as_ref())
-                    )));
+            for (i, name) in names.iter().enumerate() {
+                match vec[i] {
+                    RespFrame::BulkString(ref cmd) => {
+                        if cmd.as_ref().to_ascii_lowercase() != name.as_bytes() {
+                            return Err(CommandError::InvalidCommand(format!(
+                                "Invalid command: expected {}, got {}",
+                                name,
+                                String::from_utf8_lossy(cmd.as_ref())
+                            )));
+                        }
+                    }
+                    _ => {
+                        return Err(CommandError::InvalidCommand(
+                            "Command must have a BulkString as the first argument".to_string(),
+                        ))
+                    }
                 }
             }
-            _ => {
-                return Err(CommandError::InvalidCommand(
-                    "Command must have a BulkString as the first argument".to_string(),
-                ))
-            }
+
+            Ok(())
         }
+        None => Err(CommandError::InvalidArgument("invalid command".to_string())),
     }
-    Ok(())
 }
 
 fn extract_args(value: RespArray, start: usize) -> Result<Vec<RespFrame>, CommandError> {
-    Ok(value.0.into_iter().skip(start).collect::<Vec<RespFrame>>())
+    match value.0 {
+        Some(vec) => Ok(vec.into_iter().skip(start).collect::<Vec<RespFrame>>()),
+        None => Err(CommandError::InvalidArgument(
+            "parse args error".to_string(),
+        )),
+    }
 }
 
 #[cfg(test)]

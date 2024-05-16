@@ -3,10 +3,9 @@ use crate::{cmd::CommandError, BulkString, RespArray, RespFrame};
 
 impl CommandExecutor for HGet {
     fn execute(self, backend: &crate::Backend) -> RespFrame {
-        match backend.hget(&self.key, &self.field) {
-            Some(value) => value,
-            None => RespFrame::Null(crate::RespNull),
-        }
+        backend
+            .hget(&self.key, &self.field)
+            .unwrap_or(RespFrame::Null(crate::RespNull))
     }
 }
 
@@ -50,10 +49,18 @@ impl TryFrom<RespArray> for HGet {
 
         let mut args = extract_args(value, 1)?.into_iter();
         match (args.next(), args.next()) {
-            (Some(RespFrame::BulkString(key)), Some(RespFrame::BulkString(field))) => Ok(HGet {
-                key: String::from_utf8(key.0)?,
-                field: String::from_utf8(field.0)?,
-            }),
+            (Some(RespFrame::BulkString(key)), Some(RespFrame::BulkString(field))) => {
+                let key = match key.0 {
+                    Some(k) => String::from_utf8(k)?,
+                    None => return Err(CommandError::InvalidArgument("Invalid key".to_string())),
+                };
+
+                let field = match field.0 {
+                    Some(k) => String::from_utf8(k)?,
+                    None => return Err(CommandError::InvalidArgument("Invalid field".to_string())),
+                };
+                Ok(HGet { key, field })
+            }
             _ => Err(CommandError::InvalidArgument(
                 "Invalid key or field".to_string(),
             )),
@@ -68,10 +75,13 @@ impl TryFrom<RespArray> for HGetAll {
 
         let mut args = extract_args(value, 1)?.into_iter();
         match args.next() {
-            Some(RespFrame::BulkString(key)) => Ok(HGetAll {
-                key: String::from_utf8(key.0)?,
-                sort: false,
-            }),
+            Some(RespFrame::BulkString(key)) => {
+                let key = match key.0 {
+                    Some(k) => String::from_utf8(k)?,
+                    None => return Err(CommandError::InvalidArgument("Invalid key".to_string())),
+                };
+                Ok(HGetAll { key, sort: false })
+            }
             _ => Err(CommandError::InvalidArgument("Invalid key".to_string())),
         }
     }
@@ -85,11 +95,16 @@ impl TryFrom<RespArray> for HSet {
         let mut args = extract_args(value, 1)?.into_iter();
         match (args.next(), args.next(), args.next()) {
             (Some(RespFrame::BulkString(key)), Some(RespFrame::BulkString(field)), Some(value)) => {
-                Ok(HSet {
-                    key: String::from_utf8(key.0)?,
-                    field: String::from_utf8(field.0)?,
-                    value,
-                })
+                let key = match key.0 {
+                    Some(k) => String::from_utf8(k)?,
+                    None => return Err(CommandError::InvalidArgument("Invalid key".to_string())),
+                };
+
+                let field = match field.0 {
+                    Some(k) => String::from_utf8(k)?,
+                    None => return Err(CommandError::InvalidArgument("Invalid field".to_string())),
+                };
+                Ok(HSet { key, field, value })
             }
             _ => Err(CommandError::InvalidArgument(
                 "Invalid key, field or value".to_string(),

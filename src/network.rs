@@ -3,7 +3,7 @@ use crate::{
     Backend, RespDecode, RespEncode, RespError, RespFrame,
 };
 use anyhow::Result;
-use futures::SinkExt;
+
 use tokio::net::TcpStream;
 use tokio_stream::StreamExt;
 use tokio_util::codec::{Decoder, Encoder, Framed};
@@ -13,23 +13,25 @@ use tracing::info;
 struct RespFrameCodec;
 
 #[derive(Debug)]
+#[allow(unused)]
 struct RedisRequest {
     frame: RespFrame,
     backend: Backend,
 }
 
 #[derive(Debug)]
+#[allow(unused)]
 struct RedisResponse {
     frame: RespFrame,
 }
 
-pub async fn stream_handler(stream: TcpStream, backend: Backend) -> Result<()> {
+pub async fn stream_handler(stream: TcpStream, _backend: Backend) -> Result<()> {
     let mut framed = Framed::new(stream, RespFrameCodec);
     loop {
-        let result = framed.next().await.unwrap();
+        let _result = framed.next().await.unwrap();
     }
 }
-
+#[allow(unused)]
 async fn request_handler(request: RedisRequest) -> Result<RedisResponse> {
     let (frame, backend) = (request.frame, request.backend);
     let cmd = Command::try_from(frame)?;
