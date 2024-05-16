@@ -1,4 +1,4 @@
-use super::{extract_args, validate_command, CommandExecutor, Set, RESP_OK};
+use super::{extract_args, validate_command, CommandExecutor, Echo, Set, RESP_OK};
 use crate::{
     cmd::{CommandError, Get},
     RespArray, RespFrame,
@@ -12,10 +12,35 @@ impl CommandExecutor for Get {
     }
 }
 
+impl CommandExecutor for Echo {
+    fn execute(self, _backend: &crate::Backend) -> RespFrame {
+        RespFrame::BulkString(self.key.into())
+    }
+}
+
 impl CommandExecutor for Set {
     fn execute(self, backend: &crate::Backend) -> RespFrame {
         backend.set(self.key, self.value);
         RESP_OK.clone()
+    }
+}
+
+impl TryFrom<RespArray> for Echo {
+    type Error = CommandError;
+    fn try_from(value: RespArray) -> Result<Self, Self::Error> {
+        validate_command(&value, &["echo"], 1)?;
+
+        let mut args = extract_args(value, 1)?.into_iter();
+        match args.next() {
+            Some(RespFrame::BulkString(key)) => {
+                let key = match key.0 {
+                    Some(k) => String::from_utf8(k)?,
+                    None => return Err(CommandError::InvalidArgument("Invalid field".to_string())),
+                };
+                Ok(Echo { key })
+            }
+            _ => Err(CommandError::InvalidArgument("Invalid key".to_string())),
+        }
     }
 }
 
